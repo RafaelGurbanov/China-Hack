@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+
+/*
+ * CampusBridge AI — visual identity.
+ *
+ * Paper and ink carry the everyday workspace. Deep forest is the signature
+ * surface for immersive moments (Money Atlas, tuition, Bridge Intelligence).
+ * Acid lime is a highlighter: key figures, the selected route, interactive
+ * moments. Signal coral marks shortfalls. A dashed line always means
+ * "illustrative or simulated" — rates, routes and sandbox transfers.
+ */
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  --color-paper: #f5f2ea;
+  --color-paper-2: #ede9df;
+  --color-paper-3: #fbfaf6;
+  --color-stone: #d9d5ca;
+  --color-stone-2: #c9c4b6;
+  --color-ink: #171916;
+  --color-ink-2: #3b3f39;
+  --color-ink-3: #62665e;
+  --color-forest: #153e35;
+  --color-forest-2: #1d5246;
+  --color-forest-deep: #0f2e27;
+  --color-mist: #a9bdb5;
+  --color-lime: #d7ff64;
+  --color-lime-2: #c6f04a;
+  --color-coral: #ff725e;
+  --color-coral-ink: #b8402c;
+
+  --radius-ctl: 6px;
+  --radius-panel: 10px;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display text-ink;
+    font-variation-settings: 'opsz' 144, 'SOFT' 30;
+    font-weight: 380;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-forest);
+    outline-offset: 2px;
+  }
+  .on-dark :focus-visible {
+    outline-color: var(--color-lime);
+  }
+  ::selection {
+    background: var(--color-lime);
+    color: var(--color-ink);
+  }
+  input[type='date']::-webkit-calendar-picker-indicator {
+    opacity: 0.6;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Display numerals: Fraunces at its largest optical size. */
+  .numeral {
+    font-family: var(--font-display);
+    font-variation-settings: 'opsz' 144, 'SOFT' 0, 'WONK' 0;
+    font-weight: 330;
+    letter-spacing: -0.035em;
+    font-variant-numeric: lining-nums tabular-nums;
+    line-height: 0.92;
+  }
+  /* Lime highlighter behind ink text, like a marker on paper. */
+  .mark {
+    background: linear-gradient(transparent 12%, var(--color-lime) 12%, var(--color-lime) 88%, transparent 88%);
+    padding: 0 0.15em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .rule {
+    border-color: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  }
+  .rule-dark {
+    border-color: color-mix(in srgb, var(--color-paper) 16%, transparent);
+  }
+  /* Dashed means illustrative or simulated, everywhere. */
+  .sim-dash {
+    border-style: dashed;
+  }
+}
+
+/* ---- Motion ----------------------------------------------------------- */
+
+@keyframes cb-draw {
+  from {
+    stroke-dashoffset: var(--len, 1200);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cb-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes cb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cb-ping {
+  0% {
+    r: 5;
+    opacity: 0.55;
+  }
+  100% {
+    r: 18;
+    opacity: 0;
+  }
+}
+
+.draw-path {
+  stroke-dasharray: var(--len, 1200);
+  animation: cb-draw 1.1s var(--ease-out-quint) both;
+}
+.grow-x {
+  transform-origin: left center;
+  animation: cb-grow 0.8s var(--ease-out-quint) both;
+}
+.rise {
+  animation: cb-rise 0.45s var(--ease-out-quint) both;
+}
+.ping {
+  animation: cb-ping 2.4s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ping {
+    display: none;
+  }
+}
+
+dialog::backdrop {
+  background: color-mix(in srgb, var(--color-ink) 62%, transparent);
+}
+dialog[open] {
+  animation: cb-rise 0.25s var(--ease-out-quint) both;
+}
