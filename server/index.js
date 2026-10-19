@@ -7,6 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createApp } from './app.js';
+import { createClaudeProvider, rulesProvider } from './assistant.js';
 import { hashPassword } from './auth.js';
 import { DEMO_ACCOUNT, audit, ensureProfile, nowIso, openDatabase, seedSampleWorkspace, tx } from './db.js';
 
@@ -53,8 +54,19 @@ if (process.argv.includes('--seed-only')) {
   process.exit(0);
 }
 
+// Optional: with ANTHROPIC_API_KEY set, Claude interprets requests and the rules engine
+// remains the automatic fallback. Without it, everything runs on the rules engine.
+const assistantProvider =
+  createClaudeProvider({
+    apiKey: env.ANTHROPIC_API_KEY,
+    model: env.ASSISTANT_MODEL || undefined,
+    timeoutMs: Number(env.ASSISTANT_TIMEOUT_MS) || undefined,
+  }) ?? rulesProvider;
+console.log(`Assistant interpretation: ${assistantProvider.label}`);
+
 const app = createApp({
   db,
+  assistantProvider,
   secureCookies: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : production,
   sessionTtlHours: Number(env.SESSION_TTL_HOURS) || 12,
   clientOrigins: (env.CLIENT_ORIGIN || 'http://localhost:5173')

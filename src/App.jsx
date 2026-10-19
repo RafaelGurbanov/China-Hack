@@ -3032,7 +3032,18 @@ function IntelligencePage() {
   const [sending, setSending] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [trail, setTrail] = useState([]);
+  const [engine, setEngine] = useState(null);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    api('/meta')
+      .then((m) => alive && setEngine(m.assistant ?? null))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -3173,7 +3184,12 @@ function IntelligencePage() {
                 ['End-of-month estimate', formatMoney(c.forecast.estimate, c.currency)],
               ]}
             />
-            <p className="mt-6 text-xs text-mist">Rules-based. No AI model is connected, and it can only see your own account. Card numbers and passwords you type are removed before anything is stored.</p>
+            <p className="mt-6 text-xs text-mist">
+              {engine?.ai
+                ? `Interpreted by ${engine.label}, with the rules engine as fallback. The model only classifies your request; figures and actions come from the CampusBridge server.`
+                : 'Rules-based. No AI model is connected.'}{' '}
+              It can only see your own account. Card numbers and passwords you type are removed before anything is stored.
+            </p>
           </aside>
         </div>
       </section>

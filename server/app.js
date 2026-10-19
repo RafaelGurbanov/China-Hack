@@ -23,7 +23,7 @@ import {
   validateEmail,
   validatePassword,
 } from '../shared/finance.js';
-import { ASSISTANT_MODE, MAX_MESSAGE_LENGTH, handleMessage, listMessages } from './assistant.js';
+import { MAX_MESSAGE_LENGTH, describeProvider, handleMessage, listMessages, rulesProvider } from './assistant.js';
 import {
   SESSION_COOKIE,
   clearedCookie,
@@ -58,6 +58,7 @@ function fieldErrors(errors) {
  * @param {number} [opts.sessionTtlHours]
  * @param {string[]} [opts.clientOrigins] extra allowed browser origins (dev server)
  * @param {string|null} [opts.clientDist] built frontend to serve, if any
+ * @param {object} [opts.assistantProvider] request interpreter; defaults to the rules engine
  */
 export function createApp({
   db,
@@ -67,6 +68,7 @@ export function createApp({
   clientOrigins = [],
   clientDist = null,
   loginLimiter = createLoginLimiter(),
+  assistantProvider = rulesProvider,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -116,7 +118,7 @@ export function createApp({
       priorities: PRIORITIES,
       routes: TRANSFER_ROUTES.map(({ id, name, kind, goodFor }) => ({ id, name, kind, goodFor })),
       rateSource: RATE_SOURCE_LABEL,
-      assistant: { ...ASSISTANT_MODE, maxLength: MAX_MESSAGE_LENGTH },
+      assistant: { ...describeProvider(assistantProvider), maxLength: MAX_MESSAGE_LENGTH },
       actionTypes: ACTION_TYPES,
     }),
   );
@@ -455,10 +457,10 @@ export function createApp({
 
   app.get('/api/assistant/messages', (req, res) => res.json({ messages: listMessages(db, req.user.id) }));
 
-  app.post('/api/assistant/messages', (req, res) => {
+  app.post('/api/assistant/messages', async (req, res) => {
     const text = req.body?.text;
     if (typeof text !== 'string') fail(400, 'Send your message as text.');
-    handleMessage(db, req.user, text, { today: today() });
+    await handleMessage(db, req.user, text, { today: today(), provider: assistantProvider });
     res.status(201).json({ messages: listMessages(db, req.user.id) });
   });
 

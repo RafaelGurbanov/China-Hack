@@ -4,6 +4,8 @@ A full-stack fintech prototype that helps international students manage money ac
 
 > **Prototype.** Exchange rates are illustrative fixed values (not live). Transfer routes are fictional archetypes ("Demo …"), not real providers. Simulated transfers never move money. CampusBridge is not a bank, payment institution or credit provider, and nothing here is financial advice.
 
+**Documentation:** [Technical documentation & security self-assessment (PDF)](docs/CampusBridge-AI-Technical-Documentation.pdf) · [Markdown version](docs/Technical-Documentation-and-Security-Self-Assessment.md) · [Screenshots](docs/screenshots/)
+
 ## Topic
 
 **International Track, Topic C: Cross-border & Student Finance Assistant.**
@@ -29,6 +31,38 @@ CampusBridge AI brings these pieces into one workspace:
 
 The demo scenario is a **fictional** Azerbaijani student in Germany: family support arrives in AZN, costs are paid in EUR.
 
+## AI as a financial participant: the agent loop
+
+Bridge Intelligence is built as an **agent loop with safety layers**, not as a chatbot. The language model (or the built-in rules engine) is a **replaceable interpretation module**: it only turns a request into a structured task. Everything that touches money is done by server code that the model cannot bypass.
+
+```
+student request
+   │
+   ▼
+[1] guard          prompt-injection classes refused (instruction override, prompt extraction,
+   │               other users' data, privilege escalation, real money); cards, IBANs,
+   │               credentials, emails and phone numbers redacted before anything else sees the text
+   ▼
+[2] interpret      replaceable module → { intent, params }
+   │               • Claude (optional, ANTHROPIC_API_KEY): forced tool call, strict schema
+   │               • rules engine: default, and automatic fallback on any model error or timeout
+   ▼
+[3] validate       server re-checks every value: intent whitelist, amount limits, currencies,
+   │               categories, dates, ownership
+   ▼
+[4] calculate      shared/finance.js computes every figure from the student's stored data
+   ▼
+[5] propose        pending action with a 15-minute expiry; nothing has changed yet
+   ▼
+[6] confirm        the student explicitly confirms (or cancels → nothing changes)
+   ▼
+[7] execute        re-validated, then run in one database transaction, sandbox only
+   ▼
+[8] record         audit event per step, including which interpreter was used
+```
+
+What the model **can** do: classify the request into one of 11 supported tasks and extract stated parameters. What it **cannot** do: see other users' data, see card numbers or credentials (redacted before it is called), produce figures shown to the student, create or confirm an action, or move money. A model that fails, times out or answers outside the schema is replaced by the rules engine for that message, and the task log says so.
+
 ## Technologies
 
 | Layer | What we used |
@@ -37,11 +71,13 @@ The demo scenario is a **fictional** Azerbaijani student in Germany: family supp
 | Backend | Node.js 22+, Express 5, REST API |
 | Database | SQLite (built-in `node:sqlite`) |
 | Security | scrypt password hashing, HTTP-only session cookies, CSRF protection, rate limiting, server-side validation, audit log |
-| Assistant | Rules-based task engine (interpret → validate → calculate → propose → confirm → execute → record), designed so an AI model can be connected later |
+| Assistant | Agent loop (guard → interpret → validate → calculate → propose → confirm → execute → record); interpretation by Claude via the Anthropic Messages API when a key is configured, with a rules engine as default and fallback |
 | Design | Fraunces, Geist and JetBrains Mono typefaces; an editorial ivory, ink, forest and lime palette |
 | Testing | Vitest (unit and API tests), Playwright (browser walkthrough at six screen sizes), ESLint |
 
-## Team
+## Team: Eltek
+
+CampusBridge AI is built by **Team Eltek**.
 
 | Name | Role | Focus |
 | --- | --- | --- |
@@ -60,7 +96,7 @@ The demo scenario is a **fictional** Azerbaijani student in Germany: family supp
 | **Budgets** | Add, edit and delete income and expenses in AZN, EUR, USD, GBP, TRY or CNY; category limits with utilisation; filters (search, type, category, currency, month); recurring and one-off bills you can mark as paid. |
 | **Tuition goals** | Target, currency, deadline, starting savings and planned monthly saving; remaining amount, required monthly saving, projected finish date, status; a chart of your plan against the pace needed; contributions with a before/after review and confirmation. |
 | **Transfers** | Write the transfer as a sentence ("Send 500 AZN to EUR"), rank four simulated routes by amount received, speed, fee or balance, pick one to see the full calculation (fee, conversion, mid rate, margin), and simulate it after an explicit acknowledgement. |
-| **Bridge Intelligence** | Rules-based (no AI model connected) task workspace: a task input, suggested tasks, a task log showing interpretation, validation and calculation, proposed actions you confirm or cancel, and a sandbox audit trail. Supported tasks include comparing and simulating transfers, saving plans, forecasts, spending explanations, adding expenses, savings contributions and credit-building basics. |
+| **Bridge Intelligence** | Task workspace (rules engine by default; Claude interprets requests when `ANTHROPIC_API_KEY` is set): a task input, suggested tasks, a task log showing interpretation, validation and calculation, proposed actions you confirm or cancel, and a sandbox audit trail. Supported tasks include comparing and simulating transfers, saving plans, forecasts, spending explanations, adding expenses, savings contributions and credit-building basics. |
 | **Activity** | Audit log grouped by day: sign-ins, edits, deletions, proposals, confirmations, rejections, expiries, validation failures and refusals, with filters. |
 | **Settings** | Home and study currency, monthly support and its arrival day, account details, sample data and clearing records. |
 
@@ -81,6 +117,16 @@ Example: *"Compare sending 500 AZN to my EUR budget and show how much I would re
 ## Design
 
 An editorial identity built on six colours: warm ivory `#F5F2EA` and ink `#171916` for the workspace, deep forest `#153E35` for immersive sections, acid lime `#D7FF64` as a highlighter for key figures and the selected route, stone `#D9D5CA` for quiet surfaces and signal coral `#FF725E` for shortfalls. Fraunces sets headlines and large figures, Geist the interface, JetBrains Mono rates, IDs and timestamps. A dashed line always means "illustrative or simulated". Motion is limited to the balance reveal, route drawing and pulses, chart drawing and progress changes, and it is switched off when the system asks for reduced motion.
+
+### Screenshots
+
+| Overview | Bridge Intelligence |
+| --- | --- |
+| ![Overview](docs/screenshots/overview.png) | ![Bridge Intelligence task log](docs/screenshots/intelligence.png) |
+| **Money Atlas** | **Transfers** |
+| ![Money Atlas](docs/screenshots/atlas.png) | ![Transfer comparison](docs/screenshots/transfers.png) |
+
+More in [docs/screenshots](docs/screenshots/). All data shown is fictional.
 
 ## Requirements
 
@@ -132,8 +178,11 @@ New accounts can start empty or with the same fictional sample data. `npm run se
 | `COOKIE_SECURE` | `true` in production | Send the session cookie only over HTTPS |
 | `CLIENT_ORIGIN` | `http://localhost:5173` | Extra browser origins allowed to call the API (comma-separated) |
 | `SEED_DEMO` | `true` | Create the fictional demo account |
+| `ANTHROPIC_API_KEY` | *(empty)* | Optional. Enables Claude as the request interpreter; without it the rules engine is used |
+| `ASSISTANT_MODEL` | `claude-haiku-5-5` | Claude model used for interpretation |
+| `ASSISTANT_TIMEOUT_MS` | `8000` | After this, the message falls back to the rules engine |
 
-No secrets are needed: there are no third-party API keys, and nothing secret is shipped to the browser.
+**Secrets.** The app runs completely without secrets. The only optional secret is `ANTHROPIC_API_KEY`: it is read from `.env` on the server, never committed (`.env` is git-ignored), never logged and never sent to the browser. The interface shows which interpreter is active.
 
 ## Database
 
@@ -144,13 +193,13 @@ To start over, stop the server and delete the database file (`data/campusbridge.
 ## Tests
 
 ```bash
-npm test          # 35 unit + API tests (Vitest, in-memory database)
+npm test          # 42 unit + API tests (Vitest, in-memory database, no network)
 npm run lint
 npm run build && npm start   # then, in another terminal:
 npm run e2e -- http://127.0.0.1:8787 e2e-shots 1440 900   # browser walkthrough (needs Playwright + Chromium)
 ```
 
-The API tests cover hashing, cookies, rate limiting, logout invalidation, CSRF, server-side validation, cross-user isolation, locked audit records, confirmation, rejection and expiry of actions, the assistant's end-to-end task, clarifying questions, and refusals. The browser walkthrough (55 checks) has been run at 1440, 1280, 1024, 768, 390 and 320 px. Restart the server between runs: five failed sign-ins per IP in 15 minutes trigger the rate limiter.
+The API tests cover hashing, cookies, rate limiting, logout invalidation, CSRF, server-side validation, cross-user isolation, locked audit records, confirmation, rejection and expiry of actions, the assistant's end-to-end task, clarifying questions, and refusals. `tests/provider.test.js` checks the Claude request format, strict validation of model output, the fallback to the rules engine, and that refused or sensitive text never reaches the model (using a fake API, no key needed). The browser walkthrough (55 checks) has been run at 1440, 1280, 1024, 768, 390 and 320 px. Restart the server between runs: five failed sign-ins per IP in 15 minutes trigger the rate limiter.
 
 ## Project structure
 
@@ -161,11 +210,13 @@ server/app.js         Express app: security headers, CSRF guard, REST routes, er
 server/auth.js        scrypt hashing, sessions, cookies, CSRF, sign-in rate limiter
 server/db.js          SQLite schema, mappers, audit helper, fictional sample data
 server/services.js    Workspace snapshot and the sandbox action workflow
-server/assistant.js   Rules-based assistant (guard → interpret → validate → compute → propose)
+server/assistant.js   Agent loop: guard, rules engine, optional Claude provider, validation, proposals
 src/App.jsx           React app: UI kit, layout, auth screens and all pages
 src/index.css         Tailwind design tokens
-tests/                Vitest unit and API tests
+tests/                Vitest unit, API and provider tests
 e2e/walkthrough.mjs   Playwright walkthrough
+docs/                 Technical documentation (PDF + Markdown) and screenshots
+LICENSE               MIT licence
 ```
 
 ### Main API endpoints
@@ -185,14 +236,19 @@ State-changing requests must carry the header `X-CampusBridge-Request: 1` (the f
 - Headers: CSP, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`; JSON bodies capped at 20 KB.
 - Audit: no passwords, tokens or message text are written to the audit log. Simulated transfers and savings contributions cannot be edited or deleted.
 
-## Adding a real AI model later
+## Connecting the language model
 
-`server/assistant.js` exposes a provider with one method, `interpret(text, context) → { intent, params }`. A language-model provider can replace `rulesProvider` there. Validation, proposal, confirmation, execution and auditing stay on the server and do not change, so a model can never execute anything on its own. Update `ASSISTANT_MODE` so the interface states accurately what is connected.
+`server/assistant.js` defines the interpretation interface `interpret(text, context) → { intent, params }`, implemented twice: `rulesProvider` and `createClaudeProvider()`. To use Claude, put `ANTHROPIC_API_KEY=...` in `.env` and restart; the startup log and the Bridge Intelligence page show the active interpreter. The Claude provider calls the Messages API with a forced `classify_task` tool whose schema lists only the supported intents and values; anything outside the schema is discarded on the server. Validation, proposal, confirmation, execution and auditing do not change, so a model can never execute anything on its own.
 
 ## Known limitations
 
 - Rates are a fixed sample table and routes are fictional; no live provider is integrated.
-- The rules-based assistant understands a limited set of phrasings.
+- The rules engine understands a limited set of phrasings.
+- The Claude provider is covered by automated tests against a fake API; its fallback was also checked against the live API with an invalid key (401 → rules engine). A successful classification with a real key has not been run yet, so treat that path as unverified until you do.
 - No email delivery, so there is no password reset or email verification; accounts are local to the server's database.
 - The rate limiter is in memory (it resets on restart and is per process).
 - SQLite suits a single server; a multi-instance deployment would need a shared database such as PostgreSQL.
+
+## Licence
+
+Code: [MIT](LICENSE), © 2026 Team Eltek. Third-party packages keep their own licences: React, React Router, Vite, Express, Tailwind CSS (MIT), Lucide icons (ISC), and the Fraunces, Geist and JetBrains Mono typefaces (SIL Open Font License 1.1, via Fontsource). The demo data, people and routes are fictional.
